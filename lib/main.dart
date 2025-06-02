@@ -1,122 +1,393 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const TemperatureConverterApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class TemperatureConverterApp extends StatelessWidget {
+  const TemperatureConverterApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: 'Temperature Converter',
+      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
+      home: const ConverterScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class ConverterScreen extends StatefulWidget {
+  const ConverterScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<ConverterScreen> createState() => _ConverterScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _ConverterScreenState extends State<ConverterScreen> {
+  final TextEditingController _inputController = TextEditingController();
+  String _selectedConversion = 'C to F'; // Default selection
+  double? _result;
+  List<String> _history = [];
 
-  void _incrementCounter() {
+  @override
+  void dispose() {
+    _inputController.dispose();
+    super.dispose();
+  }
+
+  void _convert() {
+    final input = _inputController.text.trim();
+    if (input.isEmpty) {
+      _showErrorDialog('Please enter a temperature value');
+      return;
+    }
+
+    final double? inputValue = double.tryParse(input);
+    if (inputValue == null) {
+      _showErrorDialog('Please enter a valid number');
+      return;
+    }
+
+    double result;
+    String historyEntry;
+
+    if (_selectedConversion == 'F to C') {
+      // °C = (°F - 32) x 5/9
+      result = (inputValue - 32) * 5 / 9;
+      historyEntry =
+          'F to C: ${inputValue.toStringAsFixed(1)} => ${result.toStringAsFixed(2)}';
+    } else {
+      // °F = °C x 9/5 + 32
+      result = inputValue * 9 / 5 + 32;
+      historyEntry =
+          'C to F: ${inputValue.toStringAsFixed(1)} => ${result.toStringAsFixed(2)}';
+    }
+
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _result = result;
+      _history.insert(0, historyEntry); // Add to beginning of list
+    });
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Error'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _clearHistory() {
+    setState(() {
+      _history.clear();
+    });
+  }
+
+  void _clearInput() {
+    setState(() {
+      _inputController.clear();
+      _result = null;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text(
+          'Temperature Converter',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w300),
+        ),
+        backgroundColor: Colors.black,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.clear_all, color: Colors.white),
+            onPressed: _clearHistory,
+            tooltip: 'Clear History',
+          ),
+        ],
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+      body: OrientationBuilder(
+        builder: (context, orientation) {
+          if (orientation == Orientation.portrait) {
+            return _buildPortraitLayout();
+          } else {
+            return _buildLandscapeLayout();
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildPortraitLayout() {
+    return Column(
+      children: [
+        Expanded(flex: 3, child: _buildCalculatorSection()),
+        Expanded(flex: 2, child: _buildHistorySection()),
+      ],
+    );
+  }
+
+  Widget _buildLandscapeLayout() {
+    return Row(
+      children: [
+        Expanded(flex: 1, child: _buildCalculatorSection()),
+        Expanded(flex: 1, child: _buildHistorySection()),
+      ],
+    );
+  }
+
+  Widget _buildCalculatorSection() {
+    return SingleChildScrollView(
+      child: Container(
+        padding: const EdgeInsets.all(20.0),
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+          children: [
+            // Conversion selector (moved to top)
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.grey[800],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap:
+                          () => setState(() => _selectedConversion = 'C to F'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color:
+                              _selectedConversion == 'C to F'
+                                  ? Colors.orange
+                                  : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '°C to °F',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color:
+                                _selectedConversion == 'C to F'
+                                    ? Colors.black
+                                    : Colors.white,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap:
+                          () => setState(() => _selectedConversion = 'F to C'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color:
+                              _selectedConversion == 'F to C'
+                                  ? Colors.orange
+                                  : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '°F to °C',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color:
+                                _selectedConversion == 'F to C'
+                                    ? Colors.black
+                                    : Colors.white,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // Input field
+            Container(
+              padding: const EdgeInsets.all(20.0),
+              decoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _inputController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w300,
+                    ),
+                    textAlign: TextAlign.center,
+                    decoration: InputDecoration(
+                      hintText: 'Enter temperature',
+                      hintStyle: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 24,
+                      ),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Result display
+                  if (_result != null)
+                    Text(
+                      _result!.toStringAsFixed(2),
+                      style: TextStyle(
+                        color: Colors.orange[300],
+                        fontSize: 48,
+                        fontWeight: FontWeight.w300,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // Convert button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _convert,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Convert',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Clear button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _clearInput,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.grey[600]!),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Clear',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w400),
+                ),
+              ),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+    );
+  }
+
+  Widget _buildHistorySection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'History',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (_history.isNotEmpty)
+                  TextButton(
+                    onPressed: _clearHistory,
+                    child: const Text(
+                      'Clear',
+                      style: TextStyle(color: Colors.orange),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child:
+                _history.isEmpty
+                    ? const Center(
+                      child: Text(
+                        'No conversions yet',
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                    )
+                    : ListView.builder(
+                      itemCount: _history.length,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: Text(
+                            _history[index],
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+          ),
+        ],
+      ),
     );
   }
 }
